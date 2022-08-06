@@ -5,6 +5,9 @@
 
 from logging import raiseExceptions
 import struct
+import random
+from vector import *
+from vector import cross
 
 # ========== Tamaños =========
 
@@ -19,6 +22,42 @@ def dword(d):
 
 def color(r, g, b):
   return bytes([int(b*255), int(g*255), int(r*255)])
+
+
+# ========== Utils =========
+
+def bounding_box(x1, y1, x2, y2, x3, y3):
+  coors = [(x1,y1),(x2,y2),(x3,y3)]
+
+  xmin = 999999
+  xmax = -999999
+  ymin = 999999 
+  ymax = -999999
+
+  for (x, y) in coors:
+      if x < xmin:
+          xmin = x
+      if x > xmax:
+          xmax = x
+      if y < ymin:
+          ymin = y
+      if y > ymax:
+          ymax = y
+  
+  return V3(xmin, ymin), V3(xmax, ymax)
+
+def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
+
+  cx, cy, cz = cross(
+    V3(x3 - x1, x2 - x1, x1 - x4), 
+    V3(y3 - y1, y2 - y1, y1 - y4)
+  )
+
+  u = cx / cz
+  v = cy / cz
+  w = 1 - u - v
+
+  return (w,v,u)
 
 # ========== Colores =========
 
@@ -142,23 +181,113 @@ class Render(object):
       #incrementa X conforme pasitos proporcionales
       x += self.inc
 
+  def triangle(self, x1, y1, x2, y2, x3, y3, col=None):
+    #self.current_color = col
 
-  def glLoad(self, filename, translate, scale):
+    #self.glLine(x1, y1, x2, y2)
+    #self.glLine(x2, y2, x3, y3)
+    #self.glLine(x3, y3, x1, y1)
+
+    x1 = round(x1)
+    y1 = round(y1)
+    x2 = round(x2)
+    y2 = round(y2)
+    x3 = round(x3)
+    y3 = round(y3)
+
+
+    if y1 > y2:
+      x1, y1, x2, y2 = x2, y2, x1, y1
+    if y1 > y3:
+      x1, y1, x3, y3 = x3, y3, x1, y1
+    if y2 > y3:
+      x2, y2, x3, y3 = x3, y3, x2, y2
+    
+    self.current_color = color(
+      random.randint(0, 255)/255,
+      random.randint(0, 255)/255,
+      random.randint(0, 255)/255,
+    )
+
+    dx_ac = x3 - x1
+    dy_ac = y3 - y1
+
+    if dy_ac == 0:
+      return
+
+    mi_ac = dx_ac / dy_ac
+
+    dx_ab = x2 - x1
+    dy_ab = y2 - y1
+
+    if dy_ab != 0:
+      mi_ab = dx_ab / dy_ab
+
+      for y in range(y1, y2+1):
+        xi = round(x1 - mi_ac * (y1 - y))
+        xf = round(x1 - mi_ab + (y1 - y))
+
+        if xi > xf:
+          xi, xf = xf, xi
+        
+        for x in range(xi, xf+1):
+          self.glVertex(x,y)
+
+    dx_bc = x3 - x2
+    dy_bc = y3 - y2
+
+    if dy_bc != 0:
+      mi_bc = dx_bc / dy_bc
+
+      for y in range(y2, y3+1):
+        xi = round(x1 - mi_ac * (y1 - y))
+        xf = round(x2 - mi_bc + (y2 - y))
+
+        if xi > xf:
+          xi, xf = xf, xi
+        
+        for x in range(xi, xf+1):
+          self.glVertex(x,y)
+
+  def transform_vertex(self, vertex, scale, translate):
+    return V3(
+      (vertex[0] * scale[0] + translate[0]),
+      (vertex[1] * scale[1] + translate[1]),
+      (vertex[2] * scale[2] + translate[2]),
+    )
+    
+  def glLoad(self, filename, translate=(0,0,0), scale=(1,1,1)):
     archivo = Obj(filename)
     
     for face in archivo.faces:
       vcount = len(face)
 
-      for j in range(vcount):
-        v1 = archivo.vertex[(face[j][0]) - 1]
-        v2 = archivo.vertex[(face[(j + 1) % vcount][0]) - 1]
-        
-        x1 = ((v1[0] + translate[0]) * scale[0])
-        y1 = ((v1[1] + translate[1]) * scale[1])
-        x2 = ((v2[0] + translate[0]) * scale[0])
-        y2 = ((v2[1] + translate[1]) * scale[1])
+      if vcount == 3:
+        f1 = face[0][0] - 1
+        f2 = face[1][0] - 1
+        f3 = face[2][0] - 1
 
-        self.glLine(x1, y1, x2, y2)
+        v1 = self.transform_vertex(archivo.vertex[f1], scale, translate)
+        v2 = self.transform_vertex(archivo.vertex[f2], scale, translate)
+        v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
+
+        self.triangle(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y)
+
+      if vcount == 4:
+        f1 = face[0][0] - 1
+        f2 = face[1][0] - 1
+        f3 = face[2][0] - 1
+        f4 = face[3][0] - 1
+
+        v1 = self.transform_vertex(archivo.vertex[f1], scale, translate)
+        v2 = self.transform_vertex(archivo.vertex[f2], scale, translate)
+        v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
+        v4 = self.transform_vertex(archivo.vertex[f4], scale, translate)
+
+        self.glLine(v1.x, v1.y, v2.x, v2.y)
+        self.glLine(v2.x, v2.y, v3.x, v3.y)
+        self.glLine(v3.x, v3.y, v4.x, v4.y)
+        self.glLine(v4.x, v4.y, v1.x, v1.y)
 
 
 class Obj(object):
@@ -197,4 +326,4 @@ class Obj(object):
             tempArray.append(tempArray2)
           
           self.faces.append(tempArray)
-
+  

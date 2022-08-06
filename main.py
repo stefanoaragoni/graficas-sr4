@@ -12,7 +12,7 @@ def glpoint():
 
     r.glColor(0.8,0.1,0.9) #parametros en rango de 0 a 1
 
-    r.glLoad('./mario.obj', (0, -50), (0.015, 0.015))
+    r.glLoad('./mario.obj', (0,-0.5,0), (0.013,0.013,0.013))
 
     r.glFinish()
 
