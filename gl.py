@@ -182,18 +182,20 @@ class Render(object):
       x += self.inc
 
   def triangle(self, x1, y1, x2, y2, x3, y3):
-
+    
     Acolor = color(1,0,0)
     Bcolor = color(0,1,0)
     Ccolor = color(0,0,1)
 
     min, max = bounding_box(x1, y1, x2, y2, x3, y3)
 
-    for x in range(round(min.x), round(max.x) + 1):
-      for y in range(round(min.y), round(max.y) + 1):
-        w, v, u = barycentric(x1, y1, x2, y2, x3, y3, x, y)
+    while((min.x) < (max.x) + 1):
+      temp = min.y
+      while((temp) < (max.y) + 1):
+        w, v, u = barycentric(x1, y1, x2, y2, x3, y3, min.x, temp)
 
         if w < 0 or v < 0 or u < 0: 
+          temp = temp + self.inc
           continue
 
         self.current_color = color(
@@ -202,7 +204,9 @@ class Render(object):
           int((Acolor[2] * w + Bcolor[2] * v + Ccolor[2] * u)/255)
         )
         
-        self.glVertex(x,y)
+        self.glVertex(min.x,temp)
+        temp = temp + self.inc
+      min.x = min.x + self.inc
 
 
   def transform_vertex(self, vertex, scale, translate):
