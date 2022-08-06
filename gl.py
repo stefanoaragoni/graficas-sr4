@@ -29,22 +29,12 @@ def color(r, g, b):
 def bounding_box(x1, y1, x2, y2, x3, y3):
   coords = [(x1,y1),(x2,y2),(x3,y3)]
 
-  xmin = 999999
-  xmax = -999999
-  ymin = 999999 
-  ymax = -999999
+  xs = [x1, x2, x3]
+  xs.sort()
+  ys = [y1, y2, y3]
+  ys.sort()
 
-  for (x, y) in coords:
-      if x < xmin:
-          xmin = x
-      if x > xmax:
-          xmax = x
-      if y < ymin:
-          ymin = y
-      if y > ymax:
-          ymax = y
-  
-  return V3(xmin, ymin), V3(xmax, ymax)
+  return V3(xs[0], ys[0]), V3(xs[-1], ys[-1])
 
 def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
 
@@ -53,9 +43,12 @@ def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
     V3(y2 - y1, y3 - y1, y1 - y4)
   )
 
+  if c.z == 0:
+    return -1, -1, -1
+
   u = c.x / c.z
   v = c.y / c.z
-  w = 1 - u - v
+  w = 1 - (c.x + c.y) / c.z
 
   return (w,v,u)
 
@@ -87,6 +80,11 @@ class Render(object):
       [self.background_color for x in range(self.width)] 
       for y in range(self.height)
     ]
+
+    self.zbuffer = [
+			[-99999 for x in range(self.width)]
+			for y in range(self.height)
+		]
 
   def glColor(self, r, g, b):
     if not (0 <= r <= 1) or not (0 <= g <= 1) or not (0 <= b <= 1):
@@ -181,11 +179,7 @@ class Render(object):
       #incrementa X conforme pasitos proporcionales
       x += self.inc
 
-  def triangle(self, x1, y1, x2, y2, x3, y3):
-    
-    Acolor = color(1,0,0)
-    Bcolor = color(0,1,0)
-    Ccolor = color(0,0,1)
+  def triangle(self, x1, y1, x2, y2, x3, y3, z1=0, z2=0, z3=0, color=None):
 
     min, max = bounding_box(x1, y1, x2, y2, x3, y3)
 
@@ -198,13 +192,15 @@ class Render(object):
           temp = temp + self.inc
           continue
 
-        self.current_color = color(
-          int((Acolor[0] * w + Bcolor[0] * v + Ccolor[0] * u)/255),
-          int((Acolor[1] * w + Bcolor[1] * v + Ccolor[1] * u)/255),
-          int((Acolor[2] * w + Bcolor[2] * v + Ccolor[2] * u)/255)
-        )
-        
-        self.glVertex(min.x,temp)
+        z = z1 * w + z2 * v + z3 * u
+        try:
+          if z > self.zbuffer[int(min.x*self.width)][int(temp*self.height)]:
+            self.current_color = color
+            self.glVertex(min.x, temp)
+            self.zbuffer[int(min.x*self.width)][int(temp*self.height)] = z
+        except:
+          pass
+
         temp = temp + self.inc
       min.x = min.x + self.inc
 
@@ -218,6 +214,7 @@ class Render(object):
     
   def glLoad(self, filename, translate=(0,0,0), scale=(1,1,1)):
     archivo = Obj(filename)
+    light = V3(0,0,1)
     
     for face in archivo.faces:
       vcount = len(face)
@@ -231,7 +228,13 @@ class Render(object):
         v2 = self.transform_vertex(archivo.vertex[f2], scale, translate)
         v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
 
-        self.triangle(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y)
+        normal = V3.normalize(V3.cross(V3.__sub__(v2, v1), V3.__sub__(v3, v1)))
+
+        intensity = V3.dot(normal, light)
+        if intensity < 0:
+          continue  
+				
+        self.triangle(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, v1.z, v2.z, v3.z, color(intensity, intensity, intensity))
 
       if vcount == 4:
         f1 = face[0][0] - 1
@@ -244,10 +247,18 @@ class Render(object):
         v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
         v4 = self.transform_vertex(archivo.vertex[f4], scale, translate)
 
+        normal = V3.normalize(V3.cross(V3.__sub__(v1, v2), V3.__sub__(v2, v3)))
+        intensity = V3.dot(normal, light)
+        if intensity < 0:
+          continue  
+        
         self.glLine(v1.x, v1.y, v2.x, v2.y)
         self.glLine(v2.x, v2.y, v3.x, v3.y)
         self.glLine(v3.x, v3.y, v4.x, v4.y)
         self.glLine(v4.x, v4.y, v1.x, v1.y)
+
+        self.triangle(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, v1.z, v2.z, v3.z, color(intensity, intensity, intensity))
+        self.triangle(v1.x, v1.y, v4.x, v4.y, v3.x, v3.y, v1.z, v4.z, v3.z, color(intensity, intensity, intensity))
 
 
 class Obj(object):

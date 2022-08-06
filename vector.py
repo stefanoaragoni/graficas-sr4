@@ -37,4 +37,9 @@ class V3(object):
         return (self.x**2 + self.y**2 + self.z**2)**0.5
     
     def normalize(self):
+
+        if self.mag() == 0:
+            return V3(0, 0, 0)
+            
         return self / self.mag()
+
