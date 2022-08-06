@@ -6,8 +6,8 @@
 from logging import raiseExceptions
 import struct
 import random
+from vector import V3
 from vector import *
-from vector import cross
 
 # ========== Tamaños =========
 
@@ -27,14 +27,14 @@ def color(r, g, b):
 # ========== Utils =========
 
 def bounding_box(x1, y1, x2, y2, x3, y3):
-  coors = [(x1,y1),(x2,y2),(x3,y3)]
+  coords = [(x1,y1),(x2,y2),(x3,y3)]
 
   xmin = 999999
   xmax = -999999
   ymin = 999999 
   ymax = -999999
 
-  for (x, y) in coors:
+  for (x, y) in coords:
       if x < xmin:
           xmin = x
       if x > xmax:
@@ -48,13 +48,13 @@ def bounding_box(x1, y1, x2, y2, x3, y3):
 
 def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
 
-  cx, cy, cz = cross(
-    V3(x3 - x1, x2 - x1, x1 - x4), 
-    V3(y3 - y1, y2 - y1, y1 - y4)
+  c = V3.cross(
+    V3(x2 - x1, x3 - x1, x1 - x4), 
+    V3(y2 - y1, y3 - y1, y1 - y4)
   )
 
-  u = cx / cz
-  v = cy / cz
+  u = c.x / c.z
+  v = c.y / c.z
   w = 1 - u - v
 
   return (w,v,u)
@@ -181,73 +181,29 @@ class Render(object):
       #incrementa X conforme pasitos proporcionales
       x += self.inc
 
-  def triangle(self, x1, y1, x2, y2, x3, y3, col=None):
-    #self.current_color = col
+  def triangle(self, x1, y1, x2, y2, x3, y3):
 
-    #self.glLine(x1, y1, x2, y2)
-    #self.glLine(x2, y2, x3, y3)
-    #self.glLine(x3, y3, x1, y1)
+    Acolor = color(1,0,0)
+    Bcolor = color(0,1,0)
+    Ccolor = color(0,0,1)
 
-    x1 = round(x1)
-    y1 = round(y1)
-    x2 = round(x2)
-    y2 = round(y2)
-    x3 = round(x3)
-    y3 = round(y3)
+    min, max = bounding_box(x1, y1, x2, y2, x3, y3)
 
+    for x in range(round(min.x), round(max.x) + 1):
+      for y in range(round(min.y), round(max.y) + 1):
+        w, v, u = barycentric(x1, y1, x2, y2, x3, y3, x, y)
 
-    if y1 > y2:
-      x1, y1, x2, y2 = x2, y2, x1, y1
-    if y1 > y3:
-      x1, y1, x3, y3 = x3, y3, x1, y1
-    if y2 > y3:
-      x2, y2, x3, y3 = x3, y3, x2, y2
-    
-    self.current_color = color(
-      random.randint(0, 255)/255,
-      random.randint(0, 255)/255,
-      random.randint(0, 255)/255,
-    )
+        if w < 0 or v < 0 or u < 0: 
+          continue
 
-    dx_ac = x3 - x1
-    dy_ac = y3 - y1
-
-    if dy_ac == 0:
-      return
-
-    mi_ac = dx_ac / dy_ac
-
-    dx_ab = x2 - x1
-    dy_ab = y2 - y1
-
-    if dy_ab != 0:
-      mi_ab = dx_ab / dy_ab
-
-      for y in range(y1, y2+1):
-        xi = round(x1 - mi_ac * (y1 - y))
-        xf = round(x1 - mi_ab + (y1 - y))
-
-        if xi > xf:
-          xi, xf = xf, xi
+        self.current_color = color(
+          int((Acolor[0] * w + Bcolor[0] * v + Ccolor[0] * u)/255),
+          int((Acolor[1] * w + Bcolor[1] * v + Ccolor[1] * u)/255),
+          int((Acolor[2] * w + Bcolor[2] * v + Ccolor[2] * u)/255)
+        )
         
-        for x in range(xi, xf+1):
-          self.glVertex(x,y)
+        self.glVertex(x,y)
 
-    dx_bc = x3 - x2
-    dy_bc = y3 - y2
-
-    if dy_bc != 0:
-      mi_bc = dx_bc / dy_bc
-
-      for y in range(y2, y3+1):
-        xi = round(x1 - mi_ac * (y1 - y))
-        xf = round(x2 - mi_bc + (y2 - y))
-
-        if xi > xf:
-          xi, xf = xf, xi
-        
-        for x in range(xi, xf+1):
-          self.glVertex(x,y)
 
   def transform_vertex(self, vertex, scale, translate):
     return V3(
