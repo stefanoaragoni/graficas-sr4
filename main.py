@@ -26,4 +26,6 @@ def glpoint():
 glpoint()
 
 
+# Correr python3 main.py para ejecutar el programa. 
+# Se tarda unos 3-4 minutos en renderizar, pero creo que es cosa de mi compu.
 
