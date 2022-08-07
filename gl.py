@@ -8,6 +8,7 @@ import struct
 import random
 from vector import V3
 from vector import *
+import numpy as np
 
 # ========== Tamaños =========
 
@@ -26,15 +27,11 @@ def color(r, g, b):
 
 # ========== Utils =========
 
-def bounding_box(x1, y1, x2, y2, x3, y3):
-  coords = [(x1,y1),(x2,y2),(x3,y3)]
+def bounding_box(x, y):
+  x.sort()
+  y.sort()
 
-  xs = [x1, x2, x3]
-  xs.sort()
-  ys = [y1, y2, y3]
-  ys.sort()
-
-  return V3(xs[0], ys[0]), V3(xs[-1], ys[-1])
+  return V3(x[0], y[0]), V3(x[-1], y[-1])
 
 def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
 
@@ -48,7 +45,7 @@ def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
 
   u = c.x / c.z
   v = c.y / c.z
-  w = 1 - (c.x + c.y) / c.z
+  w = 1 - ((c.x + c.y) / c.z)
 
   return (w,v,u)
 
@@ -126,6 +123,38 @@ class Render(object):
 
     f.close()
 
+  def glFinishZbuffer(self):
+    f = open('zbuffer.bmp', 'bw')
+
+    # File header (14 bytes)
+    f.write(char('B'))
+    f.write(char('M'))
+    f.write(dword(14 + 40 + self.width * self.height * 3))
+    f.write(dword(0))
+    f.write(dword(14 + 40))
+
+    # Image header (40 bytes)
+    f.write(dword(40))
+    f.write(dword(self.width))
+    f.write(dword(self.height))
+    f.write(word(1))
+    f.write(word(24))
+    f.write(dword(0))
+    f.write(dword(self.width * self.height * 3))
+    f.write(dword(0))
+    f.write(dword(0))
+    f.write(dword(0))
+    f.write(dword(0))
+
+    for y in range(self.height-1, -1, -1):
+      for x in range(self.width):
+        try:
+          f.write(self.zbuffer[x][y])
+        except:
+          f.write(color(0,0,0))
+
+    f.close()
+
   def glVertex(self, x, y):
     if not (-1 <= x <= 1) or not (-1 <= y <= 1):
       raise Exception('Coordenada invalida. Ingrese valores entre -1 y 1.')
@@ -179,30 +208,31 @@ class Render(object):
       #incrementa X conforme pasitos proporcionales
       x += self.inc
 
-  def triangle(self, x1, y1, x2, y2, x3, y3, z1=0, z2=0, z3=0, color=None):
+  def triangle(self, v1, v2, v3, color = None):
 
-    min, max = bounding_box(x1, y1, x2, y2, x3, y3)
 
-    while((min.x) < (max.x) + 1):
-      temp = min.y
-      while((temp) < (max.y) + 1):
-        w, v, u = barycentric(x1, y1, x2, y2, x3, y3, min.x, temp)
+    min, max = bounding_box([v1.x, v2.x, v3.x],[v1.y, v2.y, v3.y])
+
+    for x in np.arange(min.x, max.x+1, self.inc):
+      for y in np.arange(min.y, max.y+1, self.inc):
+        w, v, u = barycentric(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, x, y)
 
         if w < 0 or v < 0 or u < 0: 
-          temp = temp + self.inc
           continue
 
-        z = z1 * w + z2 * v + z3 * u
+        z = v1.z * w + v2.z * v + v3.z * u
         try:
-          if z > self.zbuffer[int(min.x*self.width)][int(temp*self.height)]:
+          tempx = int(self.x2 + (self.width2/2) + (x * self.width2/2))
+          tempy = int(self.y2 + (self.height2/2) + (-y * self.height2/2))
+
+          if z > self.zbuffer[tempx][tempy]:
+            self.zbuffer[tempx][tempy] = z
             self.current_color = color
-            self.glVertex(min.x, temp)
-            self.zbuffer[int(min.x*self.width)][int(temp*self.height)] = z
+            self.glVertex(x, y)
+
         except:
           pass
 
-        temp = temp + self.inc
-      min.x = min.x + self.inc
 
 
   def transform_vertex(self, vertex, scale, translate):
@@ -229,12 +259,11 @@ class Render(object):
         v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
 
         normal = V3.normalize(V3.cross(V3.__sub__(v2, v1), V3.__sub__(v3, v1)))
-
         intensity = V3.dot(normal, light)
         if intensity < 0:
           continue  
 				
-        self.triangle(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, v1.z, v2.z, v3.z, color(intensity, intensity, intensity))
+        self.triangle(v1, v2, v3, color(intensity, intensity, intensity))
 
       if vcount == 4:
         f1 = face[0][0] - 1
@@ -251,14 +280,16 @@ class Render(object):
         intensity = V3.dot(normal, light)
         if intensity < 0:
           continue  
-        
+
+        """
         self.glLine(v1.x, v1.y, v2.x, v2.y)
         self.glLine(v2.x, v2.y, v3.x, v3.y)
         self.glLine(v3.x, v3.y, v4.x, v4.y)
         self.glLine(v4.x, v4.y, v1.x, v1.y)
+        """
 
-        self.triangle(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, v1.z, v2.z, v3.z, color(intensity, intensity, intensity))
-        self.triangle(v1.x, v1.y, v4.x, v4.y, v3.x, v3.y, v1.z, v4.z, v3.z, color(intensity, intensity, intensity))
+        self.triangle(v1, v2, v3, color(intensity, intensity, intensity))
+        self.triangle(v1, v4, v3, color(intensity, intensity, intensity))
 
 
 class Obj(object):
