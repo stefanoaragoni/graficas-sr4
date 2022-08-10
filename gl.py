@@ -263,7 +263,7 @@ class Render(object):
       
         try:
           if z > self.zbuffer[tempx][tempy]:
-            self.zbuffer[tempx][tempy] = z/tempx
+            self.zbuffer[tempx][tempy] = z
             self.current_color = color
             self.glVertex(x_temp, y_temp)
         except:

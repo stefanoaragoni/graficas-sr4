@@ -11,8 +11,8 @@ def glpoint():
 
     r.glColor(1,1,1) #parametros en rango de 0 a 1
 
-    ''' CARRO 3D'''
-    r.glLoad('./Car.obj', (0,-200,0), (300,300,300))
+    ''' BODY 3D'''
+    r.glLoad('./body.obj', (0,-400,0), (800,800,800))
     
     #out.bmp retorna render del modelo usando flat shading
     r.glFinish()
