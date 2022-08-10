@@ -5,10 +5,9 @@
 
 from logging import raiseExceptions
 import struct
-import random
-from vector import V3
 from vector import *
 import numpy as np
+from collections import namedtuple
 
 # ========== Tamaños =========
 
@@ -24,6 +23,47 @@ def dword(d):
 def color(r, g, b):
   return bytes([int(b*255), int(g*255), int(r*255)])
 
+# ========== VECTOR =========
+V3 = namedtuple('Point3', ['x', 'y', 'z'])
+
+
+def sum(v0, v1):
+  return V3(v0.x + v1.x, v0.y + v1.y, v0.z + v1.z)
+
+def sub(v0, v1):
+  return V3(v0.x - v1.x, v0.y - v1.y, v0.z - v1.z)
+
+def mul(v0, k):
+  return V3(v0.x * k, v0.y * k, v0.z *k)
+
+def dot(v0, v1):
+  return v0.x * v1.x + v0.y * v1.y + v0.z * v1.z
+
+def cross(v0, v1):
+  return V3(
+    v0.y * v1.z - v0.z * v1.y,
+    v0.z * v1.x - v0.x * v1.z,
+    v0.x * v1.y - v0.y * v1.x,
+  )
+
+def length(v0):
+  """
+    Input: 1 size 3 vector
+    Output: Scalar with the length of the vector
+  """  
+  return (v0.x**2 + v0.y**2 + v0.z**2)**0.5
+
+def norm(v0):
+  """
+    Input: 1 size 3 vector
+    Output: Size 3 vector with the normal of the vector
+  """  
+  v0length = length(v0)
+
+  if not v0length:
+    return V3(0, 0, 0)
+
+  return V3(v0.x/v0length, v0.y/v0length, v0.z/v0length)
 
 # ========== Utils =========
 
@@ -31,11 +71,11 @@ def bounding_box(x, y):
   x.sort()
   y.sort()
 
-  return V3(x[0], y[0]), V3(x[-1], y[-1])
+  return V3(x[0], y[0], 0), V3(x[-1], y[-1], 0)
 
 def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
 
-  c = V3.cross(
+  c = cross(
     V3(x2 - x1, x3 - x1, x1 - x4), 
     V3(y2 - y1, y3 - y1, y1 - y4)
   )
@@ -43,11 +83,7 @@ def barycentric(x1, y1, x2, y2, x3, y3, x4, y4):
   if c.z == 0:
     return -1, -1, -1
 
-  u = c.x / c.z
-  v = c.y / c.z
-  w = 1 - ((c.x + c.y) / c.z)
-
-  return (w,v,u)
+  return (c.x / c.z, c.y / c.z, 1 - ((c.x + c.y) / c.z))
 
 # ========== Colores =========
 
@@ -210,7 +246,6 @@ class Render(object):
 
   def triangle(self, v1, v2, v3, color = None):
 
-
     min, max = bounding_box([v1.x, v2.x, v3.x],[v1.y, v2.y, v3.y])
 
     for x in np.arange(min.x, max.x+1, self.inc):
@@ -258,8 +293,8 @@ class Render(object):
         v2 = self.transform_vertex(archivo.vertex[f2], scale, translate)
         v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
 
-        normal = V3.normalize(V3.cross(V3.__sub__(v2, v1), V3.__sub__(v3, v1)))
-        intensity = V3.dot(normal, light)
+        normal = norm(cross(sub(v2, v1), sub(v3, v1)))
+        intensity = dot(normal, light)
         if intensity < 0:
           continue  
 				
@@ -276,8 +311,8 @@ class Render(object):
         v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
         v4 = self.transform_vertex(archivo.vertex[f4], scale, translate)
 
-        normal = V3.normalize(V3.cross(V3.__sub__(v1, v2), V3.__sub__(v2, v3)))
-        intensity = V3.dot(normal, light)
+        normal = norm(cross(sub(v1, v2), sub(v2, v3)))
+        intensity = dot(normal, light)
         if intensity < 0:
           continue  
 
