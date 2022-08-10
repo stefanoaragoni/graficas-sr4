@@ -184,7 +184,7 @@ class Render(object):
     for y in range(self.height-1, -1, -1):
       for x in range(self.width):
         try:
-          f.write(self.zbuffer[x][y])
+          f.write(color(self.zbuffer[x][y]/255,self.zbuffer[x][y]/255,self.zbuffer[x][y]/255))
         except:
           f.write(color(0,0,0))
 
@@ -243,7 +243,7 @@ class Render(object):
       #incrementa X conforme pasitos proporcionales
       x += self.inc
 
-  def triangle(self, v1, v2, v3, color = None):
+  def triangle(self, v1, v2, v3, color_ = None):
 
     min, max = bounding_box([v1.x, v2.x, v3.x],[v1.y, v2.y, v3.y])
 
@@ -261,13 +261,10 @@ class Render(object):
         tempx = int(self.x2 + (self.width2/2) + (x_temp * self.width2/2))
         tempy = int(self.y2 + (self.height2/2) + (-y_temp * self.height2/2))
       
-        try:
-          if z > self.zbuffer[tempx][tempy]:
-            self.zbuffer[tempx][tempy] = z
-            self.current_color = color
-            self.glVertex(x_temp, y_temp)
-        except:
-          pass
+        if z > self.zbuffer[tempx][tempy]:
+          self.zbuffer[tempx][tempy] = z
+          self.current_color = color_
+          self.glVertex(x_temp, y_temp)
 
 
   def transform_vertex(self, vertex, scale, translate):
