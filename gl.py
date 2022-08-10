@@ -5,7 +5,6 @@
 
 from logging import raiseExceptions
 import struct
-from vector import *
 import numpy as np
 from collections import namedtuple
 
@@ -248,33 +247,34 @@ class Render(object):
 
     min, max = bounding_box([v1.x, v2.x, v3.x],[v1.y, v2.y, v3.y])
 
-    for x in np.arange(min.x, max.x+1, self.inc):
-      for y in np.arange(min.y, max.y+1, self.inc):
+    for x in range(min.x, max.x+1):
+      for y in range(min.y, max.y+1):
         w, v, u = barycentric(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, x, y)
 
         if w < 0 or v < 0 or u < 0: 
           continue
 
         z = v1.z * w + v2.z * v + v3.z * u
+
+        x_temp, y_temp = x/self.width, y/self.height
+        
+        tempx = int(self.x2 + (self.width2/2) + (x_temp * self.width2/2))
+        tempy = int(self.y2 + (self.height2/2) + (-y_temp * self.height2/2))
+      
         try:
-          tempx = int(self.x2 + (self.width2/2) + (x * self.width2/2))
-          tempy = int(self.y2 + (self.height2/2) + (-y * self.height2/2))
-
           if z > self.zbuffer[tempx][tempy]:
-            self.zbuffer[tempx][tempy] = z
+            self.zbuffer[tempx][tempy] = z/tempx
             self.current_color = color
-            self.glVertex(x, y)
-
+            self.glVertex(x_temp, y_temp)
         except:
           pass
 
 
-
   def transform_vertex(self, vertex, scale, translate):
     return V3(
-      (vertex[0] * scale[0] + translate[0]),
-      (vertex[1] * scale[1] + translate[1]),
-      (vertex[2] * scale[2] + translate[2]),
+      round(vertex[0] * scale[0] + translate[0]),
+      round(vertex[1] * scale[1] + translate[1]),
+      round(vertex[2] * scale[2] + translate[2]),
     )
     
   def glLoad(self, filename, translate=(0,0,0), scale=(1,1,1)):
